@@ -160,6 +160,14 @@ class CustomLogHandler(logging.Handler):
         else:
             print_message(msg, "info")
 
+custom_handler = CustomLogHandler()
+custom_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+custom_handler.setFormatter(formatter)
+
+# 将自定义处理器添加到根记录器中
+logging.getLogger().addHandler(custom_handler)
+
 class SimulationStage(Enum):
     """Stages of the MD simulation workflow"""
     SETUP = auto()
@@ -1040,6 +1048,30 @@ class MolecularDynamicsTools:
             "output_file": "analysis/dssp.dat",
             "analysis_type": "Secondary Structure"
         }
+    
+    def set_simulation_stage(self, stage: str) -> Dict[str, Any]:
+        """
+        Set the current simulation stage
+        
+        Args:
+            stage: Name of the stage to set
+            
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            self.stage = SimulationStage[stage]
+            return {
+                "success": True,
+                "stage": self.stage.name,
+                "previous_stage": self.stage.name
+            }
+        except KeyError:
+            return {
+                "success": False,
+                "error": f"Unknown stage: {stage}. Available stages: {[s.name for s in SimulationStage]}"
+            }
+            
  
 class MDLLMAgent:
     """LLM-based agent for running molecular dynamics simulations with GROMACS"""
@@ -1622,7 +1654,7 @@ def main():
         print_message(f"Initializing with model: {args.model}", "info")
         print_message(f"Using workspace: {args.workspace}", "info")
         
-        agent = MDLLMAgent(api_key=args.api_key, model=args.model, workspace=args.workspace, url=args.url)
+        agent = MDLLMAgent(api_key=api_key, model=args.model, workspace=args.workspace, url=args.url)
         agent.run(starting_prompt=args.prompt)
         
     except KeyboardInterrupt:
