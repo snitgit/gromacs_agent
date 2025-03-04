@@ -5,6 +5,14 @@ Let LLM run your MDs.
 ## Introduction  
 This agent automates **MD simulations** for proteins in water using **GROMACS**. It sets up the system, runs simulations, and analyzes **RMSD, RMSF, Rg, H-bonds**, etc.  
 
+
+<video controls>
+  <source src="https://github.com/ChatMol/gromacs_copilot/raw/main/assets/1pga_gmx_copilot_animation.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+
+
 [A demo of output report](./assets/report.pdf)
 
 ## How to Run  
