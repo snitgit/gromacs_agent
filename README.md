@@ -16,9 +16,10 @@ pip install git+https://github.com/ChatMol/gromacs_copilot.git
 ```
 2. Prepare a working dir and a input pdb
 ```bash
-mkdir md_workspace
+mkdir md_workspace && cd md_workspace
 wget https://files.rcsb.org/download/1PGA.pdb
 grep -v HOH 1PGA.pdb > 1pga_protein.pdb
+cd ..
 ```
 
 ### Using DeepSeek  
