@@ -12,7 +12,7 @@ This agent automates **MD simulations** for proteins in water using **GROMACS**.
 ### Before using a LLM
 1. Install teh package
 ```bash
-pip install git+
+pip install git+https://github.com/ChatMol/gromacs_copilot.git
 ```
 2. Prepare a working dir and a input pdb
 ```bash
@@ -23,8 +23,8 @@ grep -v HOH 1PGA.pdb > 1pga_protein.pdb
 
 ### Using DeepSeek  
 ```bash
-python gmx_copilot.py --workspace md_workspace/ \
---prompt "setup simulation system for 1pga_no_water.pdb in the workspace" \
+gmx_copilot --workspace md_workspace/ \
+--prompt "setup simulation system for 1pga_protein.pdb in the workspace" \
 --api-key $DEEPSEEK_API_KEY \
 --model deepseek-chat \
 --url https://api.deepseek.com/chat/completions
@@ -32,8 +32,8 @@ python gmx_copilot.py --workspace md_workspace/ \
 
 ### Using OpenAI  
 ```bash
-python gmx_copilot.py --workspace md_workspace/ \
---prompt "setup simulation system for 1pga_no_water.pdb in the workspace" \
+gmx_copilot --workspace md_workspace/ \
+--prompt "setup simulation system for 1pga_protein.pdb in the workspace" \
 --api-key $OPENAI_API_KEY \
 --model gpt-4o \
 --url https://api.openai.com/v1/chat/completions
