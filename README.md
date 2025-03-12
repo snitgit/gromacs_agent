@@ -36,7 +36,8 @@ This agent automates **MD simulations** for proteins in water using **GROMACS**.
 1. Install the package
 ```bash
 pip install git+https://github.com/ChatMol/gromacs_copilot.git
-conda install -c conda-forge acpype
+conda install -c conda-forge acpype # for protein-ligand complex
+conda install -c conda-forge gmx_mmpbsa # for MM-PBSA/GBSA analysis
 ```
 2. Prepare a working dir and a input pdb
 ```bash
