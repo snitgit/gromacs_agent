@@ -10,9 +10,11 @@ from typing import List, Dict, Any, Optional, Union
 
 from gromacs_copilot.protocols.protein import ProteinProtocol
 from gromacs_copilot.protocols.protein_ligand import ProteinLigandProtocol
+from gromacs_copilot.protocols.mmpbsa import MMPBSAProtocol
+
 from gromacs_copilot.utils.terminal import print_message, prompt_user
 from gromacs_copilot.core.enums import MessageType, SimulationStage
-from gromacs_copilot.config import SYSTEM_MESSAGE
+from gromacs_copilot.config import SYSTEM_MESSAGE_ADVISOR, SYSTEM_MESSAGE_AGENT
 
 
 class MDLLMAgent:
@@ -20,7 +22,7 @@ class MDLLMAgent:
     
     def __init__(self, api_key: str = None, model: str = "gpt-4o", 
                 workspace: str = "./md_workspace", 
-                url: str = "https://api.openai.com/v1/chat/completions"):
+                url: str = "https://api.openai.com/v1/chat/completions", mode: str = "copilot"):
         """
         Initialize the MD LLM agent
         
@@ -41,8 +43,42 @@ class MDLLMAgent:
         
         # Initialize protocol (will be set to protein or protein-ligand as needed)
         self.protocol = ProteinProtocol(workspace)
+        self.mode = mode
         
         logging.info(f"MD LLM Agent initialized with model: {model}")
+
+    def switch_to_mmpbsa_protocol(self) -> Dict[str, Any]:
+        """
+        Switch to MM-PBSA protocol
+        
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Create new MM-PBSA protocol
+            old_protocol = self.protocol
+            self.protocol = MMPBSAProtocol(self.workspace)
+            
+            # Copy relevant state from the old protocol if possible
+            if hasattr(old_protocol, 'topology_file'):
+                self.protocol.topology_file = old_protocol.topology_file
+            
+            if hasattr(old_protocol, 'trajectory_file'):
+                self.protocol.trajectory_file = old_protocol.trajectory_file
+            
+            logging.info("Switched to MM-PBSA protocol")
+            
+            return {
+                "success": True,
+                "message": "Switched to MM-PBSA protocol successfully",
+                "previous_protocol": old_protocol.__class__.__name__,
+                "current_protocol": "MMPBSAProtocol"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to switch to MM-PBSA protocol: {str(e)}"
+            }
     
     def get_tool_schema(self) -> List[Dict[str, Any]]:
         """
@@ -90,18 +126,6 @@ class MDLLMAgent:
                 "function": {
                     "name": "check_gromacs_installation",
                     "description": "Check if GROMACS is installed and available",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "check_dependencies",
-                    "description": "Check if all required dependencies are installed",
                     "parameters": {
                         "type": "object",
                         "properties": {},
@@ -352,30 +376,6 @@ class MDLLMAgent:
             {
                 "type": "function",
                 "function": {
-                    "name": "analyze_hydrogen_bonds",
-                    "description": "Perform hydrogen bond analysis",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "analyze_secondary_structure",
-                    "description": "Perform secondary structure analysis",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
                     "name": "analyze_ligand_rmsd",
                     "description": "Perform RMSD analysis focused on the ligand",
                     "parameters": {
@@ -415,6 +415,134 @@ class MDLLMAgent:
                     }
                 }
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_mmpbsa_index_file",
+                    "description": "Create index file for MM-PBSA analysis",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "protein_selection": {
+                                "type": "string",
+                                "description": "Selection for protein group"
+                            },
+                            "ligand_selection": {
+                                "type": "string",
+                                "description": "Selection for ligand group"
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_mmpbsa_input",
+                    "description": "Create input file for MM-PBSA/GBSA calculation",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "description": "Method to use (pb or gb)",
+                                "enum": ["pb", "gb"]
+                            },
+                            "startframe": {
+                                "type": "integer",
+                                "description": "First frame to analyze"
+                            },
+                            "endframe": {
+                                "type": "integer",
+                                "description": "Last frame to analyze"
+                            },
+                            "interval": {
+                                "type": "integer",
+                                "description": "Interval between frames"
+                            },
+                            "ionic_strength": {
+                                "type": "number",
+                                "description": "Ionic strength for calculation"
+                            },
+                            "with_entropy": {
+                                "type": "boolean",
+                                "description": "Whether to include entropy calculation"
+                            }
+                        },
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "run_mmpbsa_calculation",
+                    "description": "Run MM-PBSA/GBSA calculation for protein-ligand binding free energy",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "ligand_mol_file": {
+                                "type": "string",
+                                "description": "The Antechamber output mol2 file of ligand parametrization"
+                            },
+                            "index_file": {
+                                "type": "string",
+                                "description": "GROMACS index file containing protein and ligand groups"
+                            },
+                            "topology_file": {
+                                "type": "string",
+                                "description": "GROMACS topology file (tpr) for the system"
+                            },
+                            "protein_group": {
+                                "type": "string",
+                                "description": "Name or index of the protein group in the index file"
+                            },
+                            "ligand_group": {
+                                "type": "string", 
+                                "description": "Name or index of the ligand group in the index file"
+                            },
+                            "trajectory_file": {
+                                "type": "string",
+                                "description": "GROMACS trajectory file (xtc) for analysis"
+                            },
+                            "overwrite": {
+                                "type": "boolean",
+                                "description": "Whether to overwrite existing output files",
+                            },
+                            "verbose": {
+                                "type": "boolean",
+                                "description": "Whether to print verbose output",
+                            }
+                        },
+                        "required": ["ligand_mol_file", "index_file", "topology_file", "protein_group", "ligand_group", "trajectory_file"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "parse_mmpbsa_results",
+                    "description": "Parse MM-PBSA/GBSA results",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "switch_to_mmpbsa_protocol",
+                    "description": "Switch to MM-PBSA protocol for binding free energy calculations",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
         ]
         
         return tools
@@ -454,7 +582,7 @@ class MDLLMAgent:
             raise Exception(f"LLM API error: {response.status_code} - {response.text}")
         
         return response.json()
-    
+
     def execute_tool_call(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute a tool call
@@ -468,7 +596,6 @@ class MDLLMAgent:
         function_name = tool_call["function"]["name"]
         arguments = json.loads(tool_call["function"]["arguments"])
         
-        # Special handling for set_ligand to switch to protein-ligand protocol
         if function_name == "set_ligand" and not isinstance(self.protocol, ProteinLigandProtocol):
             # Switch to protein-ligand protocol
             old_protocol = self.protocol
@@ -479,6 +606,8 @@ class MDLLMAgent:
             self.protocol.stage = old_protocol.stage
             
             logging.info("Switched to protein-ligand protocol")
+        elif function_name == "switch_to_mmpbsa_protocol":
+            return self.switch_to_mmpbsa_protocol()
         
         # Get the method from the protocol class
         if hasattr(self.protocol, function_name):
@@ -499,10 +628,16 @@ class MDLLMAgent:
             starting_prompt: Optional starting prompt for the LLM
         """
         # Initialize conversation with system message
-        system_message = {
-            "role": "system",
-            "content": SYSTEM_MESSAGE
-        }
+        if self.mode == "copilot":
+            system_message = {
+                "role": "system",
+                "content": SYSTEM_MESSAGE_ADVISOR
+            }
+        else:
+            system_message = {
+                "role": "system",
+                "content": SYSTEM_MESSAGE_AGENT
+            }
         
         self.conversation_history = [system_message]
         

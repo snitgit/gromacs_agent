@@ -11,5 +11,6 @@ __all__ = [
     'BaseProtocol',
     'ProteinProtocol',
     'ProteinLigandProtocol',
-    'AnalysisProtocol'
+    'AnalysisProtocol',
+    'MMPBSAProtocol'
 ]

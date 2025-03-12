@@ -38,6 +38,9 @@ def parse_arguments():
     parser.add_argument("--log-level", default="INFO", 
                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                        help="Logging level")
+    parser.add_argument("--mode", default="copilot", choices=['copilot', 'agent'],
+                        help="The copilot mode or agent mode, copilot will be more like a advisor."
+                        )
     
     return parser.parse_args()
 
@@ -88,7 +91,8 @@ def main():
             api_key=api_key, 
             model=args.model, 
             workspace=args.workspace, 
-            url=args.url
+            url=args.url,
+            mode=args.mode
         )
         agent.run(starting_prompt=args.prompt)
         
