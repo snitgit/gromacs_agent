@@ -32,6 +32,30 @@ class BaseProtocol(ABC):
         os.chdir(self.workspace)
         
         logging.info(f"Protocol initialized with workspace: {self.workspace}")
+
+    
+    def check_gromacs_installation(self) -> Dict[str, Any]:
+        """
+        Check if GROMACS is installed and available
+        
+        Returns:
+            Dictionary with GROMACS installation information
+        """
+        result = self.run_shell_command("gmx --version", capture_output=True)
+        
+        if result["success"]:
+            version_info = result["stdout"].strip()
+            return {
+                "success": True,
+                "installed": True,
+                "version": version_info
+            }
+        else:
+            return {
+                "success": False,
+                "installed": False,
+                "error": "GROMACS is not installed or not in PATH"
+            }
     
     def run_shell_command(self, command: str, capture_output: bool = True,
                          suppress_output: bool = False) -> Dict[str, Any]:

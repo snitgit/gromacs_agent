@@ -64,6 +64,14 @@ gmx_copilot --workspace md_workspace/ \
 --url https://api.openai.com/v1/chat/completions
 ```  
 
+3. Agent mode
+The agent mode is good automation of a long acting trajectory of using tools.
+```bash
+gmx_copilot --workspace md_workspace/ \
+--prompt "run 1 ns production md for 1pga_protein.pdb in the workspace, and analyze rmsd" \
+--mode agent
+```
+
 The agent handles **system setup, simulation execution, and result analysis** automatically. 🚀
 
 
@@ -77,3 +85,11 @@ For commercial licensing, [read this](COMMERCIAL_LICENSE.md).
 ## Known issues  
 1. 🤖 LLM sometimes struggles with selecting the correct group index. Double-checking the selection is recommended.  
 2. ⚡ The interaction between LLM and `gmx` prompt input isn't always seamless. Running commands based on suggestions can help you get the correct results more easily.
+
+## Disclaimer
+
+GROMACS Copilot is provided "as is" without warranty of any kind, express or implied. The authors and contributors disclaim all warranties including, but not limited to, the implied warranties of merchantability and fitness for a particular purpose. Users employ this software at their own risk.
+
+The authors bear no responsibility for any consequences arising from the use, misuse, or misinterpretation of this software or its outputs. Results obtained through GROMACS Copilot should be independently validated prior to use in research, publications, or decision-making processes.
+
+This software is intended for research and educational purposes only. Users are solely responsible for ensuring compliance with applicable laws, regulations, and ethical standards in their jurisdiction.
