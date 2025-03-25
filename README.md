@@ -65,6 +65,15 @@ gmx_copilot --workspace md_workspace/ \
 --url https://api.openai.com/v1/chat/completions
 ```  
 
+### Using Gemini
+```bash
+gmx_copilot --workspace md_workspace/ \
+--prompt "setup simulation system for 1pga_protein.pdb in the workspace" \
+--api-key $GEMINI_API_KEY \
+--model gemini-2.0-flash \
+--url https://generativelanguage.googleapis.com/v1beta/chat/completions
+```
+
 3. Agent mode
 The agent mode is good automation of a long acting trajectory of using tools.
 ```bash

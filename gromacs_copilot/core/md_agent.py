@@ -256,7 +256,17 @@ class MDLLMAgent:
                             },
                             "params": {
                                 "type": "object",
-                                "description": "Optional override parameters"
+                                "description": "Optional override parameters",
+                                "properties": {
+                                    "nsteps": {
+                                        "type": "integer",
+                                        "description": "Number of steps"
+                                    },
+                                    "dt": {
+                                        "type": "number",
+                                        "description": "Time step (fs)"
+                                    }
+                                }
                             }
                         },
                         "required": ["mdp_type"]
