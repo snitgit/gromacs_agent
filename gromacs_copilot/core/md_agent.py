@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional, Union
 from gromacs_copilot.protocols.protein import ProteinProtocol
 from gromacs_copilot.protocols.protein_ligand import ProteinLigandProtocol
 from gromacs_copilot.protocols.mmpbsa import MMPBSAProtocol
+from gromacs_copilot.protocols.analysis import AnalysisProtocol
 
 from gromacs_copilot.utils.terminal import print_message, prompt_user
 from gromacs_copilot.core.enums import MessageType, SimulationStage
@@ -22,7 +23,7 @@ class MDLLMAgent:
     
     def __init__(self, api_key: str = None, model: str = "gpt-4o", 
                 workspace: str = "./md_workspace", 
-                url: str = "https://api.openai.com/v1/chat/completions", mode: str = "copilot"):
+                url: str = "https://api.openai.com/v1/chat/completions", mode: str = "copilot", gmx_bin: str = "gmx"):
         """
         Initialize the MD LLM agent
         
@@ -40,9 +41,10 @@ class MDLLMAgent:
         self.model = model
         self.conversation_history = []
         self.workspace = workspace
+        self.gmx_bin = gmx_bin
         
         # Initialize protocol (will be set to protein or protein-ligand as needed)
-        self.protocol = ProteinProtocol(workspace)
+        self.protocol = ProteinProtocol(workspace, self.gmx_bin)
         self.mode = mode
         
         logging.info(f"MD LLM Agent initialized with model: {model}")
@@ -78,6 +80,72 @@ class MDLLMAgent:
             return {
                 "success": False,
                 "error": f"Failed to switch to MM-PBSA protocol: {str(e)}"
+            }
+        
+    def switch_to_protein_ligand_protocol(self) -> Dict[str, Any]:
+        """
+        Switch to Protein-Ligand protocol
+        
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Create new Protein-Ligand protocol
+            old_protocol = self.protocol
+            self.protocol = ProteinLigandProtocol(self.workspace)
+            
+            # Copy relevant state from the old protocol if possible
+            if hasattr(old_protocol, 'topology_file'):
+                self.protocol.topology_file = old_protocol.topology_file
+            
+            if hasattr(old_protocol, 'trajectory_file'):
+                self.protocol.trajectory_file = old_protocol.trajectory_file
+            
+            logging.info("Switched to Protein-Ligand protocol")
+            
+            return {
+                "success": True,
+                "message": "Switched to Protein-Ligand protocol successfully",
+                "previous_protocol": old_protocol.__class__.__name__,
+                "current_protocol": "ProteinLigandProtocol"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to switch to Protein-Ligand protocol: {str(e)}"
+            }
+        
+    def switch_to_analysis_protocol(self) -> Dict[str, Any]:
+        """
+        Switch to Analysis protocol
+        
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Create new Analysis protocol
+            old_protocol = self.protocol
+            self.protocol = AnalysisProtocol(self.workspace)
+            
+            # Copy relevant state from the old protocol if possible
+            if hasattr(old_protocol, 'topology_file'):
+                self.protocol.topology_file = old_protocol.topology_file
+            
+            if hasattr(old_protocol, 'trajectory_file'):
+                self.protocol.trajectory_file = old_protocol.trajectory_file
+            
+            logging.info("Switched to Analysis protocol")
+            
+            return {
+                "success": True,
+                "message": "Switched to Analysis protocol successfully",
+                "previous_protocol": old_protocol.__class__.__name__,
+                "current_protocol": "AnalysisProtocol"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to switch to Analysis protocol: {str(e)}"
             }
     
     def get_tool_schema(self) -> List[Dict[str, Any]]:

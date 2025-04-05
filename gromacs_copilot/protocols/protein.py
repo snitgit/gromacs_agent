@@ -15,7 +15,7 @@ from gromacs_copilot.config import FORCE_FIELDS
 class ProteinProtocol(BaseProtocol):
     """Protocol for protein-only simulations"""
     
-    def __init__(self, workspace: str = "./md_workspace"):
+    def __init__(self, workspace: str = "./md_workspace", gmx_bin: str = "gmx"):
         """
         Initialize the protein simulation protocol
         
@@ -32,6 +32,7 @@ class ProteinProtocol(BaseProtocol):
         self.minimized_file = None
         self.equilibrated_file = None
         self.production_file = None
+        self.gmx_bin = gmx_bin
         
         logging.info(f"Protein protocol initialized with workspace: {self.workspace}")
     
@@ -93,7 +94,7 @@ class ProteinProtocol(BaseProtocol):
         Returns:
             Dictionary with prerequisite check information
         """
-        result = self.run_shell_command("gmx --version", capture_output=True)
+        result = self.run_shell_command(f"{self.gmx_bin} --version", capture_output=True)
         
         if result["success"]:
             version_info = result["stdout"].strip()
@@ -173,7 +174,7 @@ class ProteinProtocol(BaseProtocol):
         ff_name = FORCE_FIELDS[force_field]
         
         # Generate topology
-        cmd = f"gmx pdb2gmx -f {self.protein_file} -o protein.gro -p topology.top -i posre.itp -ff {ff_name} -water {water_model}"
+        cmd = f"{self.gmx_bin} pdb2gmx -f {self.protein_file} -o protein.gro -p topology.top -i posre.itp -ff {ff_name} -water {water_model}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -210,7 +211,7 @@ class ProteinProtocol(BaseProtocol):
                 "error": "No protein structure file has been processed"
             }
         
-        cmd = f"gmx editconf -f {self.box_file} -o box.gro -c -d {distance} -bt {box_type}"
+        cmd = f"{self.gmx_bin} editconf -f {self.box_file} -o box.gro -c -d {distance} -bt {box_type}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -241,7 +242,7 @@ class ProteinProtocol(BaseProtocol):
                 "error": "Box file or topology file not defined"
             }
         
-        cmd = f"gmx solvate -cp {self.box_file} -cs spc216.gro -o solvated.gro -p {self.topology_file}"
+        cmd = f"{self.gmx_bin} solvate -cp {self.box_file} -cs spc216.gro -o solvated.gro -p {self.topology_file}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -280,7 +281,7 @@ class ProteinProtocol(BaseProtocol):
             return ions_mdp
         
         # Prepare for adding ions
-        cmd = f"gmx grompp -f ions.mdp -c {self.solvated_file} -p {self.topology_file} -o ions.tpr"
+        cmd = f"{self.gmx_bin} grompp -f ions.mdp -c {self.solvated_file} -p {self.topology_file} -o ions.tpr"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -291,7 +292,7 @@ class ProteinProtocol(BaseProtocol):
         
         # Add ions
         neutral_flag = "-neutral" if neutral else ""
-        cmd = f"echo 'SOL' | gmx genion -s ions.tpr -o solvated_ions.gro -p {self.topology_file} -pname NA -nname CL {neutral_flag} -conc {concentration}"
+        cmd = f"echo 'SOL' | {self.gmx_bin} genion -s ions.tpr -o solvated_ions.gro -p {self.topology_file} -pname NA -nname CL {neutral_flag} -conc {concentration}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -328,7 +329,7 @@ class ProteinProtocol(BaseProtocol):
             return em_mdp
         
         # Generate tpr file for minimization
-        cmd = f"gmx grompp -f em.mdp -c {self.solvated_file} -p {self.topology_file} -o em.tpr"
+        cmd = f"{self.gmx_bin} grompp -f em.mdp -c {self.solvated_file} -p {self.topology_file} -o em.tpr"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -338,14 +339,21 @@ class ProteinProtocol(BaseProtocol):
             }
         
         # Run energy minimization
-        cmd = "gmx mdrun -v -deffnm em"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm em"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
-            return {
-                "success": False,
-                "error": f"Energy minimization failed: {result['stderr']}"
-            }
+            # return {
+            #     "success": False,
+            #     "error": f"Energy minimization failed: {result['stderr']}"
+            # }
+            cmd = f"{self.gmx_bin} mdrun -ntmpi 1 -v -deffnm em"
+            result = self.run_shell_command(cmd)
+            if not result["success"]:
+                return {
+                    "success": False,
+                    "error": f"Energy minimization failed: {result['stderr']}"
+                }
         
         self.minimized_file = "em.gro"
         
@@ -375,7 +383,8 @@ class ProteinProtocol(BaseProtocol):
             return nvt_mdp
         
         # Generate tpr file for NVT equilibration
-        cmd = f"gmx grompp -f nvt.mdp -c {self.minimized_file} -r {self.minimized_file} -p {self.topology_file} -o nvt.tpr"
+        cmd = f"{self.gmx_bin} grompp -f nvt.mdp -c {self.minimized_file} -r {self.minimized_file} -p {self.topology_file} -o nvt.tpr"
+        # print(f"Running command: {cmd}")
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -385,14 +394,21 @@ class ProteinProtocol(BaseProtocol):
             }
         
         # Run NVT equilibration
-        cmd = "gmx mdrun -v -deffnm nvt"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm nvt"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
-            return {
-                "success": False,
-                "error": f"NVT equilibration failed: {result['stderr']}"
-            }
+            # return {
+            #     "success": False,
+            #     "error": f"NVT equilibration failed: {result['stderr']}"
+            # }
+            cmd = f"{self.gmx_bin} mdrun -ntmpi 1 -v -deffnm nvt"
+            result = self.run_shell_command(cmd)
+            if not result["success"]:
+                return {
+                    "success": False,
+                    "error": f"NVT equilibration failed: {result['stderr']}"
+                }
         
         return {
             "success": True,
@@ -415,7 +431,7 @@ class ProteinProtocol(BaseProtocol):
             return npt_mdp
         
         # Generate tpr file for NPT equilibration
-        cmd = f"gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p {self.topology_file} -o npt.tpr"
+        cmd = f"{self.gmx_bin} grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p {self.topology_file} -o npt.tpr"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -425,14 +441,21 @@ class ProteinProtocol(BaseProtocol):
             }
         
         # Run NPT equilibration
-        cmd = "gmx mdrun -v -deffnm npt"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm npt"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
-            return {
-                "success": False,
-                "error": f"NPT equilibration failed: {result['stderr']}"
-            }
+            # return {
+            #     "success": False,
+            #     "error": f"NPT equilibration failed: {result['stderr']}"
+            # }
+            cmd = f"{self.gmx_bin} mdrun -ntmpi 1 -v -deffnm npt"
+            result = self.run_shell_command(cmd)
+            if not result["success"]:
+                return {
+                    "success": False,
+                    "error": f"NPT equilibration failed: {result['stderr']}"
+                }
         
         self.equilibrated_file = "npt.gro"
         
@@ -469,7 +492,7 @@ class ProteinProtocol(BaseProtocol):
             return md_mdp
         
         # Generate tpr file for production MD
-        cmd = f"gmx grompp -f md.mdp -c {self.equilibrated_file} -t npt.cpt -p {self.topology_file} -o md.tpr"
+        cmd = f"{self.gmx_bin} grompp -f md.mdp -c {self.equilibrated_file} -t npt.cpt -p {self.topology_file} -o md.tpr"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -479,14 +502,21 @@ class ProteinProtocol(BaseProtocol):
             }
         
         # Run production MD
-        cmd = "gmx mdrun -v -deffnm md"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm md"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
-            return {
-                "success": False,
-                "error": f"Production MD failed: {result['stderr']}"
-            }
+            # return {
+            #     "success": False,
+            #     "error": f"Production MD failed: {result['stderr']}"
+            # }
+            cmd = f"{self.gmx_bin} mdrun -ntmpi 1 -v -deffnm md"
+            result = self.run_shell_command(cmd)
+            if not result["success"]:
+                return {
+                    "success": False,
+                    "error": f"Production MD failed: {result['stderr']}"
+                }
         
         self.production_file = "md.gro"
         
@@ -509,7 +539,7 @@ class ProteinProtocol(BaseProtocol):
         # Create analysis directory if it doesn't exist
         mkdir_result = self.run_shell_command("mkdir -p analysis")
         
-        cmd = "echo 'Protein Protein' | gmx rms -s md.tpr -f md.xtc -o analysis/rmsd.xvg -tu ns"
+        cmd = f"echo 'Protein Protein' | {self.gmx_bin} rms -s md.tpr -f md.xtc -o analysis/rmsd.xvg -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -534,7 +564,7 @@ class ProteinProtocol(BaseProtocol):
         # Create analysis directory if it doesn't exist
         mkdir_result = self.run_shell_command("mkdir -p analysis")
         
-        cmd = "echo 'C-alpha' | gmx rmsf -s md.tpr -f md.xtc -o analysis/rmsf.xvg -res"
+        cmd = f"echo 'C-alpha' | {self.gmx_bin} rmsf -s md.tpr -f md.xtc -o analysis/rmsf.xvg -res"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -559,7 +589,7 @@ class ProteinProtocol(BaseProtocol):
         # Create analysis directory if it doesn't exist
         mkdir_result = self.run_shell_command("mkdir -p analysis")
         
-        cmd = "echo 'Protein' | gmx gyrate -s md.tpr -f md.xtc -o analysis/gyrate.xvg"
+        cmd = f"echo 'Protein' | {self.gmx_bins} gyrate -s md.tpr -f md.xtc -o analysis/gyrate.xvg"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:

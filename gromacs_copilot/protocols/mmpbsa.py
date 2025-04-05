@@ -13,7 +13,7 @@ from gromacs_copilot.utils.shell import check_command_exists, run_shell_command
 class MMPBSAProtocol(BaseProtocol):
     """Protocol for MM-PBSA/GBSA binding free energy calculations"""
     
-    def __init__(self, workspace: str = "./md_workspace"):
+    def __init__(self, workspace: str = "./md_workspace", gmx_bin: str = "gmx"):
         """
         Initialize the MM-PBSA protocol
         
@@ -30,6 +30,7 @@ class MMPBSAProtocol(BaseProtocol):
         self.ligand_group = None
         self.complex_group = None
         self.mmpbsa_dir = os.path.join(workspace, "mmpbsa")
+        self.gmx_bin = gmx_bin
         
         # Create MM-PBSA directory if it doesn't exist
         if not os.path.exists(self.mmpbsa_dir):
@@ -77,7 +78,7 @@ class MMPBSAProtocol(BaseProtocol):
             Dictionary with prerequisite check information
         """
         # Check GROMACS installation
-        gromacs_result = run_shell_command("gmx --version", capture_output=True)
+        gromacs_result = run_shell_command(f"{self.gmx_bin} --version", capture_output=True)
         gromacs_installed = gromacs_result["success"]
         
         # Check gmx_MMPBSA installation

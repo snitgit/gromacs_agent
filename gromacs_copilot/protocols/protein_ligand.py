@@ -15,7 +15,7 @@ from gromacs_copilot.utils.shell import check_command_exists
 class ProteinLigandProtocol(ProteinProtocol):
     """Protocol for protein-ligand simulations"""
     
-    def __init__(self, workspace: str = "./md_workspace"):
+    def __init__(self, workspace: str = "./md_workspace", gmx_bin: str = "gmx"):
         """
         Initialize the protein-ligand simulation protocol
         
@@ -30,6 +30,7 @@ class ProteinLigandProtocol(ProteinProtocol):
         self.complex_file = None
         self.has_ligand = False
         self.index_file = None
+        self.gmx_bin = gmx_bin
         
         logging.info(f"Protein-ligand protocol initialized with workspace: {self.workspace}")
     
@@ -284,7 +285,7 @@ with open("param/ligand/ligand.pdb","w") as file:
             }
         
         # Generate restraints for ligand
-        ndx_cmd = """echo $'r LIG & !a H*\nname 3 LIG-H\nq'| gmx make_ndx -f param/ligand/ligand.acpype/ligand_NEW.pdb -o lig_noh.ndx"""
+        ndx_cmd = f"echo $'r LIG & !a H*\nname 3 LIG-H\nq'| {self.gmx_bin} make_ndx -f param/ligand/ligand.acpype/ligand_NEW.pdb -o lig_noh.ndx"
         ndx_result = self.run_shell_command(ndx_cmd)
         if not ndx_result["success"]:
             return {
@@ -349,7 +350,7 @@ with open("param/ligand/ligand.pdb","w") as file:
         ff_name = FORCE_FIELDS[force_field]
         
         # Generate topology for receptor
-        cmd = f"cd param/receptor && gmx pdb2gmx -f receptor.pdb -o receptor_GMX.pdb -p topol.top -i posre.itp -ff {ff_name} -water {water_model}"
+        cmd = f"cd param/receptor && {self.gmx_bin} pdb2gmx -f receptor.pdb -o receptor_GMX.pdb -p topol.top -i posre.itp -ff {ff_name} -water {water_model}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -443,7 +444,7 @@ with open("param/ligand/ligand.pdb","w") as file:
             }
         
         # Create index groups
-        ndx_cmd = f"""echo -e "1 | r LIG\\nr SOL | r CL | r NA\\nq" | gmx make_ndx -f {self.solvated_file} -o index.ndx"""
+        ndx_cmd = f"""echo -e "1 | r LIG\\nr SOL | r CL | r NA\\nq" | {self.gmx_bin} make_ndx -f {self.solvated_file} -o index.ndx"""
         ndx_result = self.run_shell_command(ndx_cmd)
         if not ndx_result["success"]:
             return {
@@ -634,7 +635,7 @@ if matches:
         
         # Generate tpr file for minimization, using index file if available
         index_option = f"-n {self.index_file}" if self.has_ligand and self.index_file else ""
-        cmd = f"gmx grompp -f em.mdp -c {self.solvated_file} -p {self.topology_file} -o em.tpr {index_option}"
+        cmd = f"{self.gmx_bin} grompp -f em.mdp -c {self.solvated_file} -p {self.topology_file} -o em.tpr {index_option}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -644,7 +645,7 @@ if matches:
             }
         
         # Run energy minimization
-        cmd = "gmx mdrun -v -deffnm em"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm em"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -683,7 +684,7 @@ if matches:
         
         # Generate tpr file for NVT equilibration, using index file if available
         index_option = f"-n {self.index_file}" if self.has_ligand and self.index_file else ""
-        cmd = f"gmx grompp -f nvt.mdp -c {self.minimized_file} -r {self.minimized_file} -p {self.topology_file} -o nvt.tpr -maxwarn 2 {index_option}"
+        cmd = f"{self.gmx_bin} grompp -f nvt.mdp -c {self.minimized_file} -r {self.minimized_file} -p {self.topology_file} -o nvt.tpr -maxwarn 2 {index_option}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -693,7 +694,7 @@ if matches:
             }
         
         # Run NVT equilibration
-        cmd = "gmx mdrun -v -deffnm nvt"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm nvt"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -725,7 +726,7 @@ if matches:
         
         # Generate tpr file for NPT equilibration, using index file if available
         index_option = f"-n {self.index_file}" if self.has_ligand and self.index_file else ""
-        cmd = f"gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p {self.topology_file} -o npt.tpr -maxwarn 2 {index_option}"
+        cmd = f"{self.gmx_bin} grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p {self.topology_file} -o npt.tpr -maxwarn 2 {index_option}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -735,7 +736,7 @@ if matches:
             }
         
         # Run NPT equilibration
-        cmd = "gmx mdrun -v -deffnm npt"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm npt"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -781,7 +782,7 @@ if matches:
         
         # Generate tpr file for production MD, using index file if available
         index_option = f"-n {self.index_file}" if self.has_ligand and self.index_file else ""
-        cmd = f"gmx grompp -f md.mdp -c {self.equilibrated_file} -t npt.cpt -p {self.topology_file} -o md.tpr -maxwarn 2 {index_option}"
+        cmd = f"{self.gmx_bin} grompp -f md.mdp -c {self.equilibrated_file} -t npt.cpt -p {self.topology_file} -o md.tpr -maxwarn 2 {index_option}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -791,7 +792,7 @@ if matches:
             }
         
         # Run production MD
-        cmd = "gmx mdrun -v -deffnm md"
+        cmd = f"{self.gmx_bin} mdrun -v -deffnm md"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -828,7 +829,7 @@ if matches:
         # Create analysis directory if it doesn't exist
         mkdir_result = self.run_shell_command("mkdir -p analysis")
         
-        cmd = "echo 'LIG LIG' | gmx rms -s md.tpr -f md.xtc -o analysis/ligand_rmsd.xvg -tu ns"
+        cmd = f"echo 'LIG LIG' | {self.gmx_bin} rms -s md.tpr -f md.xtc -o analysis/ligand_rmsd.xvg -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -859,7 +860,7 @@ if matches:
         # Create analysis directory if it doesn't exist
         mkdir_result = self.run_shell_command("mkdir -p analysis")
         
-        cmd = "echo -e 'Protein\\nLIG' | gmx mindist -s md.tpr -f md.xtc -od analysis/protein_ligand_mindist.xvg -tu ns"
+        cmd = f"echo -e 'Protein\\nLIG' | {self.gmx_bin} mindist -s md.tpr -f md.xtc -od analysis/protein_ligand_mindist.xvg -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:

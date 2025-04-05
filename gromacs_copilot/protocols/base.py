@@ -14,7 +14,7 @@ from gromacs_copilot.core.enums import SimulationStage
 class BaseProtocol(ABC):
     """Base class for simulation protocols"""
     
-    def __init__(self, workspace: str = "./md_workspace"):
+    def __init__(self, workspace: str = "./md_workspace", gmx_bin: str = "gmx"):
         """
         Initialize the base protocol
         
@@ -30,6 +30,7 @@ class BaseProtocol(ABC):
         
         # Change to workspace directory
         os.chdir(self.workspace)
+        self.gmx_bin = gmx_bin
         
         logging.info(f"Protocol initialized with workspace: {self.workspace}")
 
@@ -41,7 +42,7 @@ class BaseProtocol(ABC):
         Returns:
             Dictionary with GROMACS installation information
         """
-        result = self.run_shell_command("gmx --version", capture_output=True)
+        result = self.run_shell_command(f"{self.gmx_bin} --version", capture_output=True)
         
         if result["success"]:
             version_info = result["stdout"].strip()

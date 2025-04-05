@@ -13,7 +13,7 @@ from gromacs_copilot.utils.shell import check_command_exists
 class AnalysisProtocol(BaseProtocol):
     """Protocol for analysis of MD simulation results"""
     
-    def __init__(self, workspace: str = "./md_workspace", has_ligand: bool = False):
+    def __init__(self, workspace: str = "./md_workspace", has_ligand: bool = False, gmx_bin: str = "gmx"):
         """
         Initialize the analysis protocol
         
@@ -28,6 +28,7 @@ class AnalysisProtocol(BaseProtocol):
         self.topology_file = None
         self.energy_file = None
         self.analysis_dir = os.path.join(workspace, "analysis")
+        self.gmx_bin = gmx_bin
         
         # Create analysis directory if it doesn't exist
         if not os.path.exists(self.analysis_dir):
@@ -74,7 +75,7 @@ class AnalysisProtocol(BaseProtocol):
             Dictionary with prerequisite check information
         """
         # Check GROMACS installation
-        gromacs_result = self.run_shell_command("gmx --version", capture_output=True)
+        gromacs_result = self.run_shell_command(f"{self.gmx_bin} --version", capture_output=True)
         gromacs_installed = gromacs_result["success"]
         
         # Check DSSP installation (optional)
@@ -117,7 +118,7 @@ class AnalysisProtocol(BaseProtocol):
             Dictionary with result information
         """
         # Create clean trajectory
-        cmd = "echo 'Protein System' | gmx trjconv -s md.tpr -f md.xtc -o analysis/clean_full.xtc -pbc nojump -ur compact -center"
+        cmd = f"echo 'Protein System' | {self.gmx_bin} trjconv -s md.tpr -f md.xtc -o analysis/clean_full.xtc -pbc nojump -ur compact -center"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -127,7 +128,7 @@ class AnalysisProtocol(BaseProtocol):
             }
         
         # Create no-water trajectory
-        cmd = "echo 'Protein non-Water' | gmx trjconv -s md.tpr -f analysis/clean_full.xtc -o analysis/clean_nowat.xtc -fit rot+trans"
+        cmd = f"echo 'Protein non-Water' |{self.gmx_bin} trjconv -s md.tpr -f analysis/clean_full.xtc -o analysis/clean_nowat.xtc -fit rot+trans"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -137,7 +138,7 @@ class AnalysisProtocol(BaseProtocol):
             }
         
         # Extract last frame as PDB
-        cmd = "echo 'Protein Protein' | gmx trjconv -s md.tpr -f analysis/clean_nowat.xtc -o analysis/protein_lastframe.pdb -pbc nojump -ur compact -center -dump 9999999999999999"
+        cmd = f"echo 'Protein Protein' |{self.gmx_bin} trjconv -s md.tpr -f analysis/clean_nowat.xtc -o analysis/protein_lastframe.pdb -pbc nojump -ur compact -center -dump 9999999999999999"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -166,7 +167,7 @@ class AnalysisProtocol(BaseProtocol):
         """
         output_file = f"analysis/rmsd_{selection.lower()}.xvg"
         
-        cmd = f"echo '{reference} {selection}' | gmx rms -s md.tpr -f analysis/clean_nowat.xtc -o {output_file} -tu ns"
+        cmd = f"echo '{reference} {selection}' |{self.gmx_bin} rms -s md.tpr -f analysis/clean_nowat.xtc -o {output_file} -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -195,7 +196,7 @@ class AnalysisProtocol(BaseProtocol):
         """
         output_file = f"analysis/rmsf_{selection.lower()}.xvg"
         
-        cmd = f"echo '{selection}' | gmx rmsf -s md.tpr -f analysis/clean_nowat.xtc -o {output_file} -res"
+        cmd = f"echo '{selection}' |{self.gmx_bin} rmsf -s md.tpr -f analysis/clean_nowat.xtc -o {output_file} -res"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -223,7 +224,7 @@ class AnalysisProtocol(BaseProtocol):
         """
         output_file = f"analysis/gyrate_{selection.lower()}.xvg"
         
-        cmd = f"echo '{selection}' | gmx gyrate -s md.tpr -f analysis/clean_nowat.xtc -o {output_file}"
+        cmd = f"echo '{selection}' |{self.gmx_bin} gyrate -s md.tpr -f analysis/clean_nowat.xtc -o {output_file}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -252,7 +253,7 @@ class AnalysisProtocol(BaseProtocol):
         """
         output_file = f"analysis/hbnum_{selection1.lower()}_{selection2.lower()}.xvg"
         
-        cmd = f"echo -e '{selection1}\\n{selection2}' | gmx hbond -s md.tpr -f analysis/clean_nowat.xtc -num {output_file}"
+        cmd = f"echo -e '{selection1}\\n{selection2}' |{self.gmx_bin} hbond -s md.tpr -f analysis/clean_nowat.xtc -num {output_file}"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -292,7 +293,7 @@ class AnalysisProtocol(BaseProtocol):
         # Set environment variable for GROMACS to find DSSP
         os.environ["DSSP"] = dssp_executable
         
-        cmd = "echo 'Protein' | gmx do_dssp -s md.tpr -f analysis/clean_nowat.xtc -o analysis/ss.xpm -ver 3 -tu ns -dt 0.05"
+        cmd = f"echo 'Protein' |{self.gmx_bin} do_dssp -s md.tpr -f analysis/clean_nowat.xtc -o analysis/ss.xpm -ver 3 -tu ns -dt 0.05"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -302,7 +303,7 @@ class AnalysisProtocol(BaseProtocol):
             }
         
         # Convert XPM to PS for better visualization
-        cmd = "gmx xpm2ps -f analysis/ss.xpm -o analysis/ss.ps -by 10 -bx 3"
+        cmd = f"{self.gmx_bin} xpm2ps -f analysis/ss.xpm -o analysis/ss.ps -by 10 -bx 3"
         ps_result = self.run_shell_command(cmd)
         
         return {
@@ -344,7 +345,7 @@ class AnalysisProtocol(BaseProtocol):
             
             output_file = f"analysis/energy_{term.lower()}.xvg"
             
-            cmd = f"echo '{term_map[term]} 0' | gmx energy -f md.edr -o {output_file}"
+            cmd = f"echo '{term_map[term]} 0' |{self.gmx_bin} energy -f md.edr -o {output_file}"
             result = self.run_shell_command(cmd)
             
             if not result["success"]:
@@ -380,7 +381,7 @@ class AnalysisProtocol(BaseProtocol):
         
         output_file = "analysis/ligand_rmsd.xvg"
         
-        cmd = "echo 'LIG LIG' | gmx rms -s md.tpr -f analysis/clean_nowat.xtc -o analysis/ligand_rmsd.xvg -tu ns"
+        cmd = f"echo 'LIG LIG' |{self.gmx_bin} rms -s md.tpr -f analysis/clean_nowat.xtc -o analysis/ligand_rmsd.xvg -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
@@ -410,7 +411,7 @@ class AnalysisProtocol(BaseProtocol):
         
         output_file = "analysis/protein_ligand_mindist.xvg"
         
-        cmd = "echo -e 'Protein\\nLIG' | gmx mindist -s md.tpr -f analysis/clean_nowat.xtc -od analysis/protein_ligand_mindist.xvg -tu ns"
+        cmd = f"echo -e 'Protein\\nLIG' |{self.gmx_bin} mindist -s md.tpr -f analysis/clean_nowat.xtc -od analysis/protein_ligand_mindist.xvg -tu ns"
         result = self.run_shell_command(cmd)
         
         if not result["success"]:
