@@ -1,4 +1,4 @@
-# GROMACS Copilot
+# GROMACS Copilot(under modification from origin to local cluster)
 **Let LLM run your MDs.**
 
 The good news: 🎉 You now have more time to hang out with your cat! 🐱💖  
